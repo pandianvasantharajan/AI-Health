@@ -5,7 +5,7 @@ This is a monorepo containing the AI Health application components.
 ## Projects
 
 ### 1. ai-health-service (Python)
-A Python FastAPI service that provides file upload functionality to AWS S3.
+A Python FastAPI service that provides file upload functionality to AWS S3. Uses Poetry for dependency management.
 
 ### 2. ai-health-ui (React) - Coming Soon
 A React frontend application for interacting with the AI Health service.

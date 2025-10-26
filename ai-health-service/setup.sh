@@ -2,7 +2,7 @@
 
 # Setup script for AI Health Service
 
-echo "🚀 Setting up AI Health Service..."
+echo "🚀 Setting up AI Health Service with Poetry..."
 
 # Check if Python is installed
 if ! command -v python3 &> /dev/null; then
@@ -12,21 +12,30 @@ fi
 
 echo "✅ Python found: $(python3 --version)"
 
-# Create virtual environment
-echo "📦 Creating virtual environment..."
-python3 -m venv venv
+# Check if Poetry is installed
+if ! command -v poetry &> /dev/null; then
+    echo "📦 Poetry not found. Installing Poetry..."
+    curl -sSL https://install.python-poetry.org | python3 -
+    export PATH="$HOME/.local/bin:$PATH"
+    
+    # Check if installation was successful
+    if ! command -v poetry &> /dev/null; then
+        echo "❌ Failed to install Poetry. Please install manually:"
+        echo "   curl -sSL https://install.python-poetry.org | python3 -"
+        echo "   Then add Poetry to your PATH and run this script again."
+        exit 1
+    fi
+fi
 
-# Activate virtual environment
-echo "🔧 Activating virtual environment..."
-source venv/bin/activate
+echo "✅ Poetry found: $(poetry --version)"
 
-# Upgrade pip
-echo "⬆️ Upgrading pip..."
-pip install --upgrade pip
+# Configure Poetry to create virtual environment in project directory
+echo "🔧 Configuring Poetry..."
+poetry config virtualenvs.in-project true
 
 # Install dependencies
-echo "📚 Installing dependencies..."
-pip install -r requirements.txt
+echo "📚 Installing dependencies with Poetry..."
+poetry install
 
 # Copy environment file
 if [ ! -f ".env" ]; then
@@ -46,10 +55,18 @@ echo "   - AWS_ACCESS_KEY_ID"
 echo "   - AWS_SECRET_ACCESS_KEY"
 echo "   - S3_BUCKET_NAME"
 echo ""
-echo "2. Activate the virtual environment:"
-echo "   source venv/bin/activate"
+echo "2. Activate the Poetry environment:"
+echo "   poetry shell"
 echo ""
 echo "3. Start the service:"
-echo "   python run.py"
+echo "   poetry run python run.py"
+echo "   # or"
+echo "   poetry run uvicorn app.main:app --reload"
 echo ""
 echo "4. Open http://localhost:8000/docs for API documentation"
+echo ""
+echo "Additional Poetry commands:"
+echo "  poetry add <package>     # Add a dependency"
+echo "  poetry remove <package>  # Remove a dependency" 
+echo "  poetry show              # List installed packages"
+echo "  poetry update            # Update dependencies"

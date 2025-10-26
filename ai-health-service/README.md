@@ -14,6 +14,7 @@ A FastAPI-based service for uploading files to AWS S3, specifically designed for
 ## Prerequisites
 
 - Python 3.8+
+- Poetry (Python dependency management)
 - AWS Account with S3 access
 - AWS credentials configured
 
@@ -72,7 +73,7 @@ docker run -p 8000:8000 \
   ai-health-service
 ```
 
-### Option 2: Local Development
+### Option 2: Local Development with Poetry
 
 1. **Clone the repository** (if not already done):
    ```bash
@@ -80,19 +81,21 @@ docker run -p 8000:8000 \
    cd AI-Health/ai-health-service
    ```
 
-2. **Run the setup script**:
+2. **Install Poetry** (if not already installed):
+   ```bash
+   curl -sSL https://install.python-poetry.org | python3 -
+   # Add Poetry to PATH (follow the instructions shown after installation)
+   ```
+
+3. **Run the setup script**:
    ```bash
    ./setup.sh
    ```
 
-3. **Or manual setup**:
+4. **Or manual setup**:
    ```bash
-   # Create virtual environment
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   
-   # Install dependencies
-   pip install -r requirements.txt
+   # Install dependencies with Poetry
+   poetry install
    
    # Set up environment
    cp .env.example .env
@@ -115,16 +118,17 @@ docker-compose logs -f
 docker-compose down
 ```
 
-#### Local Development
+#### Local Development with Poetry
 **Development mode**:
 ```bash
-source venv/bin/activate  # Activate virtual environment
-python run.py
-```
+# Activate Poetry environment
+poetry shell
 
-**Or using uvicorn directly**:
-```bash
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+# Run the application
+poetry run python run.py
+
+# Or start with uvicorn directly
+poetry run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 The API will be available at `http://localhost:8000`
@@ -291,7 +295,39 @@ ai-health-service/
 1. Create new modules in the `app/modules/` directory
 2. Add new endpoints in `app/main.py`
 3. Update configuration in `app/config.py` if needed
-4. Update `requirements.txt` for new dependencies
+4. Add new dependencies with Poetry: `poetry add <package-name>`
+5. Update development dependencies: `poetry add --group dev <package-name>`
+
+### Poetry Commands Reference
+
+```bash
+# Install dependencies
+poetry install
+
+# Add a new dependency
+poetry add requests
+
+# Add a development dependency
+poetry add --group dev pytest
+
+# Remove a dependency
+poetry remove requests
+
+# Update all dependencies
+poetry update
+
+# Show installed packages
+poetry show
+
+# Export requirements (if needed for compatibility)
+poetry export -f requirements.txt --output requirements.txt
+
+# Run commands in virtual environment
+poetry run python script.py
+
+# Activate shell
+poetry shell
+```
 
 ## Production Deployment
 
