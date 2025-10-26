@@ -1,0 +1,11 @@
+This is a test document for the AI Health Service file upload functionality.
+
+The service can upload PDF files to AWS S3 for processing by AI health applications.
+
+Features:
+- PDF validation
+- Secure S3 storage
+- Unique file naming
+- Metadata preservation
+
+Created: October 26, 2025
