@@ -8,6 +8,7 @@ A FastAPI-based service for uploading files to AWS S3, specifically designed for
 - **Generic File Upload**: Support for uploading any file type
 - **S3 Integration**: Secure file storage using AWS S3
 - **File URL Generation**: Generate presigned URLs for secure file access
+- **AI Care Plans**: Generate comprehensive care plans from prescriptions using Amazon Bedrock
 - **Input Validation**: Comprehensive file validation and error handling
 - **RESTful API**: Clean, well-documented REST endpoints
 
@@ -187,6 +188,43 @@ Once the server is running, visit:
     "expiration_seconds": 3600
   }
   ```
+
+### Care Plan Generation
+
+#### Generate Care Plan from Prescription
+- **POST** `/care-plan/generate`
+- **Parameters**:
+  - `prescription`: Doctor prescription with patient info and medications
+  - `model_id`: Optional Bedrock model ID (uses default if not specified)
+- **Response**:
+  ```json
+  {
+    "success": true,
+    "message": "Care plan generated successfully",
+    "care_plan": {
+      "patient_summary": "Brief patient overview",
+      "care_goals": ["Goal 1", "Goal 2"],
+      "medication_management": [...],
+      "lifestyle_recommendations": [...],
+      "monitoring_schedule": [...],
+      "warning_signs": [...],
+      "follow_up_recommendations": [...]
+    },
+    "model_used": "anthropic.claude-3-sonnet-20240229-v1:0"
+  }
+  ```
+
+#### Generate Sample Care Plan
+- **POST** `/care-plan/sample`
+- Generate care plan using predefined sample data (requires Bedrock access)
+
+#### Demo Care Plan Structure
+- **POST** `/care-plan/demo`
+- Shows expected care plan structure without requiring Bedrock access
+
+#### List Available Models
+- **GET** `/care-plan/models`
+- List available Amazon Bedrock models for care plan generation
 
 ## Configuration
 
