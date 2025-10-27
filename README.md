@@ -37,10 +37,11 @@ AI-Health/
 - **Testing**: pytest with comprehensive test coverage
 
 ### ✅ AI/ML Capabilities
-- **Amazon Bedrock Integration**: Claude 3 Sonnet for care plan generation
+- **Amazon Bedrock Integration**: Multiple foundation models for care plan generation
 - **Medical Data Models**: Structured prescription and patient information
 - **Care Plan Templates**: Comprehensive healthcare management plans
-- **Multiple AI Models**: Support for Claude 3 Sonnet, Haiku, and Titan models
+- **Multiple AI Models**: Support for Claude 4.5, 3.7, 3.5, 3 Sonnet models and Amazon Nova Micro
+- **Medical Factors Analysis**: Specialized handling of complex multi-comorbidity cases
 
 ## 🛠️ Quick Start
 

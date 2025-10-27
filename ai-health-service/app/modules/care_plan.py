@@ -216,8 +216,16 @@ Provide only the JSON response, no additional text.
         Returns:
             Generated care plan
         """
+        # ADD COMPREHENSIVE DEBUG LOGGING
+        logger.info("=== BEDROCK CARE PLAN GENERATION DEBUG ===")
+        logger.info(f"🎯 Model ID: {model_id}")
+        logger.info(f"🏥 Diagnosis: {prescription.diagnosis}")
+        logger.info(f"👤 Patient Age: {prescription.patient_info.age}")
+        logger.info(f"🔑 AWS Region: {self.bedrock_client._client_config.region_name}")
+        
         try:
             prompt = self._create_prompt(prescription)
+            logger.info(f"📝 Prompt length: {len(prompt)} characters")
             
             # Prepare request body based on model type
             if "anthropic.claude" in model_id:
@@ -233,6 +241,7 @@ Provide only the JSON response, no additional text.
                     "temperature": 0.3,
                     "top_p": 0.9
                 }
+                logger.info("🤖 Using Claude format")
             elif "amazon.titan" in model_id:
                 body = {
                     "inputText": prompt,
@@ -242,6 +251,26 @@ Provide only the JSON response, no additional text.
                         "topP": 0.9
                     }
                 }
+                logger.info("🤖 Using Titan format")
+            elif "amazon.nova" in model_id:
+                body = {
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "text": prompt
+                                }
+                            ]
+                        }
+                    ],
+                    "inferenceConfig": {
+                        "max_new_tokens": 4000,
+                        "temperature": 0.3,
+                        "top_p": 0.9
+                    }
+                }
+                logger.info("🤖 Using Nova format")
             else:
                 # Default to Claude format
                 body = {
@@ -255,8 +284,13 @@ Provide only the JSON response, no additional text.
                     ],
                     "temperature": 0.3
                 }
+                logger.info("🤖 Using default Claude format")
+            
+            logger.info(f"📦 Request body keys: {list(body.keys())}")
+            logger.info(f"📏 Request body size: {len(json.dumps(body))} bytes")
             
             # Call Bedrock
+            logger.info("🚀 Calling Bedrock API...")
             response = self.bedrock_client.invoke_model(
                 modelId=model_id,
                 body=json.dumps(body),
@@ -264,40 +298,76 @@ Provide only the JSON response, no additional text.
                 accept='application/json'
             )
             
+            logger.info("✅ Bedrock API call successful!")
+            logger.info(f"📊 Response metadata: {response.get('ResponseMetadata', {})}")
+            
             # Parse response
             response_body = json.loads(response['body'].read())
+            logger.info(f"📋 Response body keys: {list(response_body.keys())}")
             
             # Extract content based on model type
             if "anthropic.claude" in model_id:
                 content = response_body['content'][0]['text']
             elif "amazon.titan" in model_id:
                 content = response_body['results'][0]['outputText']
+            elif "amazon.nova" in model_id:
+                content = response_body['output']['message']['content'][0]['text']
             else:
                 content = response_body.get('content', [{}])[0].get('text', '')
+            
+            logger.info(f"📝 Generated content length: {len(content)} characters")
             
             # Parse JSON response
             try:
                 care_plan_data = json.loads(content.strip())
                 care_plan = CarePlan(**care_plan_data)
                 
-                logger.info(f"Successfully generated care plan for diagnosis: {prescription.diagnosis}")
+                logger.info(f"✅ Successfully generated care plan for diagnosis: {prescription.diagnosis}")
                 return care_plan
                 
             except json.JSONDecodeError as e:
-                logger.error(f"Failed to parse Bedrock response as JSON: {e}")
+                logger.error(f"❌ Failed to parse Bedrock response as JSON: {e}")
+                logger.error(f"📄 Raw content preview: {content[:200]}...")
                 # Fallback: create basic care plan
                 return self._create_fallback_care_plan(prescription, content)
                 
         except ClientError as e:
             error_code = e.response['Error']['Code']
-            logger.error(f"Bedrock API error: {error_code} - {str(e)}")
+            error_message = e.response['Error']['Message']
+            
+            # DETAILED ERROR LOGGING
+            logger.error("❌ === BEDROCK CLIENT ERROR DETAILS ===")
+            logger.error(f"🚫 Error Code: {error_code}")
+            logger.error(f"💬 Error Message: {error_message}")
+            logger.error(f"🎯 Model ID Used: {model_id}")
+            logger.error(f"🌍 Region: {self.bedrock_client._client_config.region_name}")
+            logger.error(f"📦 Request Details: {e.response}")
             
             if error_code == 'AccessDeniedException':
+                logger.error("🔒 ACCESS DENIED - Possible causes:")
+                logger.error("   1. Model access not requested in Bedrock console")
+                logger.error("   2. Payment method required for premium models")
+                logger.error("   3. IAM permissions insufficient")
+                logger.error("   4. Model not available in region")
                 raise Exception("Access denied to Amazon Bedrock. Check IAM permissions.")
             elif error_code == 'ValidationException':
+                logger.error("⚠️  VALIDATION ERROR - Possible causes:")
+                logger.error("   1. Incorrect model ID format")
+                logger.error("   2. Invalid request parameters")
+                logger.error("   3. Model requires different API format")
                 raise Exception("Invalid request to Bedrock. Check model ID and parameters.")
             else:
+                logger.error(f"🔥 OTHER ERROR: {error_code}")
                 raise Exception(f"Bedrock error: {error_code}")
+                
+        except Exception as e:
+            logger.error("💥 === UNEXPECTED ERROR ===")
+            logger.error(f"❌ Error Type: {type(e).__name__}")
+            logger.error(f"💬 Error Message: {str(e)}")
+            logger.error(f"🎯 Model ID: {model_id}")
+            import traceback
+            logger.error(f"📚 Traceback: {traceback.format_exc()}")
+            raise Exception(f"Unexpected error in care plan generation: {str(e)}")
                 
         except Exception as e:
             logger.error(f"Unexpected error generating care plan: {str(e)}")
@@ -364,7 +434,7 @@ Provide only the JSON response, no additional text.
             List of available model IDs
         """
         try:
-            bedrock_client = boto3.client('bedrock')
+            bedrock_client = boto3.client('bedrock', region_name=self.bedrock_client._client_config.region_name)
             response = bedrock_client.list_foundation_models()
             
             # Filter for text generation models suitable for care plans
@@ -377,11 +447,270 @@ Provide only the JSON response, no additional text.
             
         except Exception as e:
             logger.error(f"Failed to list Bedrock models: {e}")
-            # Return common model IDs as fallback including latest Claude models
+            # Return common model IDs as fallback including latest Claude models and Nova
             return [
                 "anthropic.claude-sonnet-4-5-20250929-v1:0",
                 "anthropic.claude-3-5-sonnet-20241022-v2:0", 
                 "anthropic.claude-3-sonnet-20240229-v1:0",
                 "anthropic.claude-3-haiku-20240307-v1:0",
-                "amazon.titan-text-express-v1"
+                "amazon.titan-text-express-v1",
+                "amazon.nova-micro-v1:0"
             ]
+
+    def check_bedrock_access(self) -> Dict[str, Any]:
+        """
+        Check AWS Bedrock access and IAM permissions
+        
+        Returns:
+            Dictionary with access check results
+        """
+        results = {
+            "timestamp": datetime.now().isoformat(),
+            "overall_access": False,
+            "checks": {}
+        }
+        
+        try:
+            # Check 1: Basic bedrock client connection
+            logger.info("🔍 === BEDROCK ACCESS CHECK ===")
+            
+            try:
+                region = self.bedrock_client._client_config.region_name
+                results["checks"]["bedrock_client"] = {
+                    "status": "success",
+                    "region": region,
+                    "message": "Bedrock runtime client initialized successfully"
+                }
+                logger.info(f"✅ Bedrock client initialized in region: {region}")
+            except Exception as e:
+                results["checks"]["bedrock_client"] = {
+                    "status": "error",
+                    "message": f"Failed to initialize Bedrock client: {str(e)}"
+                }
+                logger.error(f"❌ Bedrock client initialization failed: {e}")
+                return results
+            
+            # Check 2: List foundation models permission
+            try:
+                bedrock_admin_client = boto3.client('bedrock', region_name=region)
+                response = bedrock_admin_client.list_foundation_models()
+                model_count = len(response.get('modelSummaries', []))
+                
+                results["checks"]["list_models"] = {
+                    "status": "success",
+                    "model_count": model_count,
+                    "message": f"Successfully listed {model_count} foundation models"
+                }
+                logger.info(f"✅ Listed {model_count} foundation models")
+                
+                # Extract available models
+                available_models = [model['modelId'] for model in response.get('modelSummaries', [])]
+                results["checks"]["list_models"]["available_models"] = available_models
+                
+            except ClientError as e:
+                error_code = e.response['Error']['Code']
+                results["checks"]["list_models"] = {
+                    "status": "error",
+                    "error_code": error_code,
+                    "message": f"Failed to list models: {e.response['Error']['Message']}"
+                }
+                logger.error(f"❌ Failed to list models: {error_code}")
+            
+            # Check 3: Test basic model invocation with simple prompt
+            test_models = [
+                "anthropic.claude-3-haiku-20240307-v1:0",  # Standard model
+                "anthropic.claude-3-sonnet-20240229-v1:0",  # Standard model
+                "us.anthropic.claude-3-7-sonnet-20250219-v1:0",  # Latest standard inference profile
+                "us.anthropic.claude-3-5-sonnet-20241022-v2:0",  # Inference profile
+                "us.anthropic.claude-sonnet-4-5-20250929-v1:0",   # Premium inference profile
+                "amazon.nova-micro-v1:0"  # Amazon Nova Micro
+            ]
+            
+            results["checks"]["model_access"] = {}
+            
+            for model_id in test_models:
+                try:
+                    logger.info(f"🧪 Testing model access: {model_id}")
+                    
+                    # Prepare test body based on model type
+                    if "amazon.nova" in model_id:
+                        test_body = {
+                            "messages": [
+                                {
+                                    "role": "user",
+                                    "content": [
+                                        {
+                                            "text": "Say 'Hello'"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "inferenceConfig": {
+                                "max_new_tokens": 10,
+                                "temperature": 0.1
+                            }
+                        }
+                    else:
+                        # Claude format
+                        test_body = {
+                            "anthropic_version": "bedrock-2023-05-31",
+                            "max_tokens": 10,
+                            "messages": [
+                                {
+                                    "role": "user",
+                                    "content": "Say 'Hello'"
+                                }
+                            ],
+                            "temperature": 0.1
+                        }
+                    
+                    response = self.bedrock_client.invoke_model(
+                        modelId=model_id,
+                        body=json.dumps(test_body),
+                        contentType='application/json',
+                        accept='application/json'
+                    )
+                    
+                    # Parse response to verify it works
+                    response_body = json.loads(response['body'].read())
+                    
+                    # Extract content based on model type
+                    if "amazon.nova" in model_id:
+                        content = response_body.get('output', {}).get('message', {}).get('content', [{}])[0].get('text', '')
+                    else:
+                        content = response_body.get('content', [{}])[0].get('text', '')
+                    
+                    results["checks"]["model_access"][model_id] = {
+                        "status": "success",
+                        "response_length": len(content),
+                        "message": "Model accessible and responding",
+                        "sample_response": content[:50] + "..." if len(content) > 50 else content
+                    }
+                    logger.info(f"✅ Model {model_id} accessible")
+                    
+                except ClientError as e:
+                    error_code = e.response['Error']['Code']
+                    error_message = e.response['Error']['Message']
+                    
+                    results["checks"]["model_access"][model_id] = {
+                        "status": "error",
+                        "error_code": error_code,
+                        "message": error_message,
+                        "details": self._analyze_model_error(error_code, error_message, model_id)
+                    }
+                    logger.error(f"❌ Model {model_id} access failed: {error_code}")
+                
+                except Exception as e:
+                    results["checks"]["model_access"][model_id] = {
+                        "status": "error",
+                        "message": f"Unexpected error: {str(e)}"
+                    }
+                    logger.error(f"❌ Unexpected error testing {model_id}: {e}")
+            
+            # Check 4: AWS credentials information
+            try:
+                sts_client = boto3.client('sts', region_name=region)
+                identity = sts_client.get_caller_identity()
+                
+                results["checks"]["aws_identity"] = {
+                    "status": "success",
+                    "account": identity.get('Account'),
+                    "user_id": identity.get('UserId'),
+                    "arn": identity.get('Arn'),
+                    "message": "AWS identity retrieved successfully"
+                }
+                logger.info(f"✅ AWS Identity: {identity.get('Arn')}")
+                
+            except Exception as e:
+                results["checks"]["aws_identity"] = {
+                    "status": "error",
+                    "message": f"Failed to get AWS identity: {str(e)}"
+                }
+                logger.error(f"❌ Failed to get AWS identity: {e}")
+            
+            # Determine overall access status
+            successful_models = [
+                model for model, result in results["checks"].get("model_access", {}).items()
+                if result["status"] == "success"
+            ]
+            
+            results["overall_access"] = len(successful_models) > 0
+            results["summary"] = {
+                "accessible_models": len(successful_models),
+                "total_models_tested": len(test_models),
+                "has_basic_access": results["checks"].get("bedrock_client", {}).get("status") == "success",
+                "can_list_models": results["checks"].get("list_models", {}).get("status") == "success"
+            }
+            
+            logger.info(f"🎯 Access check complete. Overall access: {results['overall_access']}")
+            
+        except Exception as e:
+            logger.error(f"💥 Access check failed with unexpected error: {e}")
+            results["checks"]["unexpected_error"] = {
+                "status": "error",
+                "message": f"Unexpected error during access check: {str(e)}"
+            }
+        
+        return results
+    
+    def _analyze_model_error(self, error_code: str, error_message: str, model_id: str) -> Dict[str, str]:
+        """
+        Analyze model access errors and provide helpful guidance
+        
+        Args:
+            error_code: AWS error code
+            error_message: AWS error message
+            model_id: Model ID that failed
+            
+        Returns:
+            Dictionary with error analysis and recommendations
+        """
+        analysis = {
+            "error_type": error_code,
+            "likely_cause": "Unknown",
+            "recommendation": "Check AWS documentation",
+            "requires_action": "Unknown"
+        }
+        
+        if error_code == 'AccessDeniedException':
+            if 'inference profile' in error_message.lower():
+                analysis.update({
+                    "likely_cause": "Model requires inference profile access",
+                    "recommendation": "Use inference profile ID (us.anthropic.* format) instead of direct model ID",
+                    "requires_action": "Update model ID format"
+                })
+            elif 'payment' in error_message.lower() or 'billing' in error_message.lower():
+                analysis.update({
+                    "likely_cause": "Premium model requires payment method",
+                    "recommendation": "Add payment method in AWS console for premium models",
+                    "requires_action": "Configure billing"
+                })
+            else:
+                analysis.update({
+                    "likely_cause": "Insufficient IAM permissions or model access not requested",
+                    "recommendation": "Check IAM permissions and request model access in Bedrock console",
+                    "requires_action": "Update IAM or request access"
+                })
+        
+        elif error_code == 'ValidationException':
+            if 'throughput' in error_message.lower():
+                analysis.update({
+                    "likely_cause": "Model requires inference profile for on-demand access",
+                    "recommendation": "Use inference profile ID (us.anthropic.* format)",
+                    "requires_action": "Update model ID"
+                })
+            else:
+                analysis.update({
+                    "likely_cause": "Invalid model ID or request format",
+                    "recommendation": "Check model ID format and request parameters",
+                    "requires_action": "Fix model ID or request format"
+                })
+        
+        elif error_code == 'ThrottlingException':
+            analysis.update({
+                "likely_cause": "Rate limit exceeded",
+                "recommendation": "Implement retry logic with backoff",
+                "requires_action": "Add rate limiting"
+            })
+        
+        return analysis
