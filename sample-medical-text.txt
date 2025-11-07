@@ -1,0 +1,26 @@
+Patient: John Doe
+Age: 65 years
+Date: November 7, 2024
+
+CHIEF COMPLAINT:
+Shortness of breath and chest pain
+
+DIAGNOSIS:
+1. Acute exacerbation of chronic heart failure
+2. Hypertension
+3. Type 2 Diabetes Mellitus
+
+MEDICATIONS PRESCRIBED:
+1. Furosemide 40mg twice daily
+2. Metoprolol 25mg once daily  
+3. Lisinopril 10mg once daily
+4. Metformin 1000mg twice daily
+
+VITAL SIGNS:
+Blood Pressure: 158/92 mmHg
+Heart Rate: 88 bpm
+Temperature: 98.6°F
+Weight: 68.0 kg
+
+FOLLOW-UP:
+Return in 1 week for evaluation.

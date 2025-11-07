@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import logging
 
 from .config import settings
-from .routes import s3_routes, care_plan_routes, bedrock_routes
+from .routes import s3_routes, care_plan_routes, bedrock_routes, text_extraction_routes
 
 # Configure logging
 logging.basicConfig(
@@ -44,6 +44,7 @@ app.add_middleware(
 app.include_router(s3_routes.router)
 app.include_router(care_plan_routes.router)
 app.include_router(bedrock_routes.router)
+app.include_router(text_extraction_routes.router)
 
 
 @app.get("/")

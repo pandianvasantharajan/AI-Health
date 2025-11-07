@@ -42,8 +42,10 @@ import {
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 
-const MedicalFactorForm = ({ onSubmit, loading, onClearCarePlan }) => {
-  const [formData, setFormData] = useState({
+const MedicalFactorForm = ({ onCarePlanGenerated, onError, onLoading, initialData, showTitle = true }) => {
+  const [loading, setLoading] = useState(false);
+  
+  const defaultFormData = {
     patient_info: {
       age: '',
       gender: '',
@@ -68,7 +70,29 @@ const MedicalFactorForm = ({ onSubmit, loading, onClearCarePlan }) => {
     ],
     doctor_notes: '',
     prescription_date: new Date(),
-  });
+  };
+
+  const [formData, setFormData] = useState(initialData || defaultFormData);
+
+  // Update form data when initialData changes
+  React.useEffect(() => {
+    if (initialData) {
+      setFormData(prevData => ({
+        ...defaultFormData,
+        ...initialData,
+        patient_info: {
+          ...defaultFormData.patient_info,
+          ...initialData.patient_info
+        },
+        prescriptions: initialData.prescriptions && initialData.prescriptions.length > 0 
+          ? initialData.prescriptions.map(prescription => ({
+              ...defaultFormData.prescriptions[0],
+              ...prescription
+            }))
+          : defaultFormData.prescriptions
+      }));
+    }
+  }, [initialData]);
 
   const [newCondition, setNewCondition] = useState('');
   const [newAllergy, setNewAllergy] = useState('');
@@ -394,7 +418,7 @@ const MedicalFactorForm = ({ onSubmit, loading, onClearCarePlan }) => {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     // Convert form data to the required format
@@ -408,7 +432,33 @@ const MedicalFactorForm = ({ onSubmit, loading, onClearCarePlan }) => {
       prescription_date: formData.prescription_date.toISOString().split('T')[0],
     };
     
-    onSubmit(submissionData);
+    setLoading(true);
+    onLoading(true);
+    
+    try {
+      // Use different API base URL for development vs production
+      const apiBaseUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:8000' : '';
+      const response = await fetch(`${apiBaseUrl}/care-plan/nova-micro`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(submissionData),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      onCarePlanGenerated(data);
+    } catch (error) {
+      console.error('Error generating care plan:', error);
+      onError(`Failed to generate care plan with Amazon Nova Micro: ${error.message}`);
+    } finally {
+      setLoading(false);
+      onLoading(false);
+    }
   };
 
   const isFormValid = () => {
