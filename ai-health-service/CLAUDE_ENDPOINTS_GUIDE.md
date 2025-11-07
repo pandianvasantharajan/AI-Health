@@ -211,7 +211,7 @@ CLAUDE_35_SONNET_MODEL_ID=us.anthropic.claude-3-5-sonnet-20241022-v2:0
 
 ## Testing
 
-1. Start the service: `docker-compose up -d`
+1. Start the service: `poetry run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`
 2. Check health: `curl http://localhost:8000/health`
 3. Test models endpoint: `curl http://localhost:8000/care-plan/models`
 4. Test demo endpoint: `curl -X POST http://localhost:8000/care-plan/demo`

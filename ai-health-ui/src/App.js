@@ -25,7 +25,9 @@ function App() {
     setCarePlan(null);
     
     try {
-      const response = await fetch('/care-plan/nova-micro', {
+      // Use different API base URL for development vs production
+      const apiBaseUrl = process.env.NODE_ENV === 'development' ? 'http://localhost:8000' : '';
+      const response = await fetch(`${apiBaseUrl}/care-plan/nova-micro`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -70,11 +72,8 @@ function App() {
         {/* Main Content */}
         <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
           <Box sx={{ mb: 3 }}>
-            <Typography variant="h4" gutterBottom align="center" color="primary">
+            <Typography variant="h4" gutterBottom align="left" color="primary">
               Medical Factor Analysis & Care Plan Generation
-            </Typography>
-            <Typography variant="body1" align="center" color="textSecondary" sx={{ mb: 3 }}>
-              Enter patient medical information to generate comprehensive care plans using AI-powered medical factor analysis
             </Typography>
 
           </Box>

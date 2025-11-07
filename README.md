@@ -15,9 +15,16 @@ AI-Health/
 │   │   └── config.py             # Configuration management
 │   ├── tests/                    # Comprehensive test suite
 │   ├── pyproject.toml            # Poetry dependency management
-│   ├── Dockerfile                # Container configuration
-│   └── docker-compose.yml        # Service orchestration
-└── ai-health-ui/          # React frontend (future implementation)
+│   └── requirements.txt          # Python dependencies
+└── ai-health-ui/          # React frontend
+    ├── src/
+    │   ├── components/           # React components
+    │   │   ├── MedicalFactorForm.js  # Medical form with prefill
+    │   │   └── CarePlanResult.js     # Care plan display
+    │   ├── App.js               # Main React application
+    │   └── index.js             # React entry point
+    ├── public/                  # Static assets
+    └── package.json             # Node.js dependencies
 ```
 
 ## 🚀 Features
@@ -27,11 +34,12 @@ AI-Health/
 - **AI Care Plan Generation**: Amazon Bedrock integration for medical care plans
 - **Health Monitoring**: Real-time service health checks and diagnostics
 - **API Documentation**: Auto-generated Swagger/OpenAPI documentation
+- **React UI**: Modern Material UI interface with medication scheduling
 
 ### ✅ Technology Stack
 - **Backend**: FastAPI (Python 3.8.1+) with async support
-- **Dependency Management**: Poetry for modern Python package management
-- **Containerization**: Docker with multi-stage builds and health checks
+- **Frontend**: React 18 with Material UI v5 components
+- **Dependency Management**: Poetry for Python, npm for Node.js
 - **Cloud Services**: AWS S3 for storage, Amazon Bedrock for AI/ML
 - **Data Validation**: Pydantic for structured data models
 - **Testing**: pytest with comprehensive test coverage
@@ -42,25 +50,44 @@ AI-Health/
 - **Care Plan Templates**: Comprehensive healthcare management plans
 - **Multiple AI Models**: Support for Claude 4.5, 3.7, 3.5, 3 Sonnet models and Amazon Nova Micro
 - **Medical Factors Analysis**: Specialized handling of complex multi-comorbidity cases
+- **Medication Scheduling**: Advanced table-based medication management
 
 ## 🛠️ Quick Start
 
 ### Prerequisites
-- Docker and Docker Compose
-- Python 3.8.1+ (for local development)
+- Python 3.8.1+ 
+- Node.js 16+ and npm
 - AWS credentials (for S3 and Bedrock access)
 
-### Using Docker (Recommended)
+### Backend Setup
 ```bash
 # Clone the repository
 git clone <repository-url>
-cd AI-Health
+cd AI-Health/ai-health-service
 
-# Start services with Docker Compose
-cd ai-health-service
-docker-compose up --build
+# Install dependencies with Poetry
+poetry install
 
-# Service will be available at http://localhost:8000
+# Set up environment variables
+cp .env.example .env
+# Edit .env with your AWS credentials
+
+# Run the backend service
+poetry run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### Frontend Setup
+```bash
+# In a new terminal, navigate to the UI directory
+cd AI-Health/ai-health-ui
+
+# Install dependencies
+npm install
+
+# Start the React development server
+npm start
+
+# UI will be available at http://localhost:3000
 ```
 
 ### Local Development
@@ -172,35 +199,11 @@ BEDROCK_MODEL_ID=anthropic.claude-3-sonnet-20240229-v1:0
 }
 ```
 
-## 🐳 Docker Configuration
-
-### Multi-Stage Build
-- **Development Stage**: Full Poetry environment for development
-- **Production Stage**: Optimized runtime with only necessary dependencies
-- **Health Checks**: Built-in container health monitoring
-
-### Service Orchestration
-```yaml
-services:
-  ai-health-service:
-    build: .
-    ports:
-      - "8000:8000"
-    environment:
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-```
-
-## 📈 Monitoring & Observability
+##  Monitoring & Observability
 
 ### Health Checks
 - **Application Health**: `/health` endpoint with service status
-- **Container Health**: Docker health checks
+- **Service Health**: Real-time monitoring of backend and frontend
 - **Dependency Health**: AWS service connectivity
 
 ### Logging
@@ -229,21 +232,23 @@ poetry run flake8 app/ tests/
 4. Run full test suite
 5. Update version and changelog
 
-## 🚀 Deployment
+## 🚀 Development Workflow
 
-### Production Environment
+### Running Both Services
 ```bash
-# Build production image
-docker build -t ai-health-service:latest .
+# Terminal 1: Start backend
+cd ai-health-service
+poetry run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
-# Deploy with Docker Compose
-docker-compose -f docker-compose.prod.yml up -d
+# Terminal 2: Start frontend
+cd ai-health-ui
+npm start
 ```
 
-### Environment-Specific Configuration
-- **Development**: Local environment with hot reloading
-- **Staging**: Pre-production testing environment
-- **Production**: Optimized for performance and security
+### Environment Configuration
+- **Backend**: Configure AWS credentials in `.env` file
+- **Frontend**: Automatically connects to backend on localhost:8000
+- **Development**: Hot reloading enabled for both services
 
 ## 📝 API Usage Examples
 

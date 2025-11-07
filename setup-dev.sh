@@ -31,7 +31,7 @@ print_error() {
 }
 
 # Check if we're in the right directory
-if [ ! -f "./ai-health-service/docker-compose.yml" ]; then
+if [ ! -f "./ai-health-service/pyproject.toml" ]; then
     print_error "Please run this script from the AI-Health root directory"
     exit 1
 fi
@@ -42,18 +42,24 @@ print_status "Starting AI Health Service setup..."
 print_status "Step 1: Starting AI Health Backend Service..."
 cd ai-health-service
 
-# Check if Docker is running
-if ! docker info > /dev/null 2>&1; then
-    print_error "Docker is not running. Please start Docker and try again."
+# Check if Python and Poetry are available
+if ! command -v python3 &> /dev/null; then
+    print_error "Python 3 is not installed. Please install Python 3.8+ and try again."
     exit 1
 fi
 
-# Build and start the service
-print_status "Building Docker image..."
-docker-compose build
+if ! command -v poetry &> /dev/null; then
+    print_error "Poetry is not installed. Please install Poetry and try again."
+    exit 1
+fi
+
+# Install dependencies and start the service
+print_status "Installing Python dependencies..."
+poetry install
 
 print_status "Starting backend service..."
-docker-compose up -d
+poetry run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000 &
+BACKEND_PID=$!
 
 # Wait for service to be ready
 print_status "Waiting for backend service to be ready..."
@@ -114,7 +120,7 @@ echo "  • Backend Health: curl http://localhost:8000/health"
 echo "  • Nova Micro Sample: curl -X POST http://localhost:8000/care-plan/nova-micro/sample"
 echo
 echo "🛑 To Stop Services:"
-echo "  • Backend: cd ai-health-service && docker-compose down"
+echo "  • Backend: kill $BACKEND_PID or Press Ctrl+C in backend terminal"
 echo "  • React: Press Ctrl+C in the React terminal"
 echo
 echo "🌐 Open http://localhost:3000 in your browser to use the AI Health Care Plan Generator!"

@@ -19,6 +19,14 @@ import {
   Menu,
   ListItemText,
   ListItemIcon,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
+  Collapse,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -28,6 +36,9 @@ import {
   Medication as MedicationIcon,
   Notes as NotesIcon,
   AutoFixHigh as SampleIcon,
+  Schedule as ScheduleIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon,
 } from '@mui/icons-material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 
@@ -47,6 +58,12 @@ const MedicalFactorForm = ({ onSubmit, loading, onClearCarePlan }) => {
         dosage: '',
         duration: '',
         instructions: '',
+        schedule: {
+          frequency: '',
+          times: [],
+          with_food: false,
+          special_instructions: '',
+        },
       },
     ],
     doctor_notes: '',
@@ -56,6 +73,7 @@ const MedicalFactorForm = ({ onSubmit, loading, onClearCarePlan }) => {
   const [newCondition, setNewCondition] = useState('');
   const [newAllergy, setNewAllergy] = useState('');
   const [sampleMenuAnchor, setSampleMenuAnchor] = useState(null);
+  const [showScheduleTable, setShowScheduleTable] = useState(false);
 
   // Sample patient data for prefilling
   const sampleCases = {
@@ -77,18 +95,36 @@ const MedicalFactorForm = ({ onSubmit, loading, onClearCarePlan }) => {
             dosage: '40mg twice daily',
             duration: '14 days, then reassess',
             instructions: 'Take with food. Monitor weight daily. Report weight gain >2lbs in 24hrs',
+            schedule: {
+              frequency: 'Twice Daily',
+              times: ['08:00', '20:00'],
+              with_food: true,
+              special_instructions: 'Monitor weight daily',
+            },
           },
           {
             medication_name: 'Metoprolol succinate',
             dosage: '25mg daily',
             duration: 'Ongoing',
             instructions: 'Take with or without food. Do not stop abruptly. Check pulse before taking',
+            schedule: {
+              frequency: 'Once Daily',
+              times: ['08:00'],
+              with_food: false,
+              special_instructions: 'Check pulse before taking',
+            },
           },
           {
             medication_name: 'Lisinopril',
             dosage: '5mg daily',
             duration: 'Ongoing',
             instructions: 'Take at same time daily. Avoid potassium supplements. Monitor kidney function',
+            schedule: {
+              frequency: 'Once Daily',
+              times: ['08:00'],
+              with_food: false,
+              special_instructions: 'Avoid potassium supplements',
+            },
           },
         ],
         doctor_notes: 'Patient presents with dyspnea, peripheral edema, and weight gain. Chest X-ray shows pulmonary edema. BNP elevated at 850. Creatinine 1.8 (baseline 1.5). Careful fluid balance management needed. Follow up in 1 week for weight and symptoms. Cardiology referral if no improvement.',
@@ -113,12 +149,24 @@ const MedicalFactorForm = ({ onSubmit, loading, onClearCarePlan }) => {
             dosage: '40mg daily for 5 days',
             duration: '5 days',
             instructions: 'Take with food to reduce stomach irritation. Complete full course',
+            schedule: {
+              frequency: 'Once Daily',
+              times: ['09:00'],
+              with_food: true,
+              special_instructions: 'Complete full course',
+            },
           },
           {
             medication_name: 'Albuterol inhaler',
             dosage: '2 puffs every 4-6 hours as needed',
             duration: '30 days',
             instructions: 'Shake well before use. Rinse mouth after use',
+            schedule: {
+              frequency: 'As Needed',
+              times: ['06:00', '10:00', '14:00', '18:00', '22:00'],
+              with_food: false,
+              special_instructions: 'Shake well, rinse mouth after use',
+            },
           },
         ],
         doctor_notes: 'Patient experiencing wheezing and shortness of breath. Peak flow reduced to 60% of baseline. Started on oral corticosteroids and bronchodilator. Follow up in 3-5 days or sooner if symptoms worsen.',
@@ -143,18 +191,36 @@ const MedicalFactorForm = ({ onSubmit, loading, onClearCarePlan }) => {
             dosage: '1000mg twice daily',
             duration: 'Ongoing',
             instructions: 'Take with meals to reduce GI upset. Monitor kidney function',
+            schedule: {
+              frequency: 'Twice Daily',
+              times: ['08:00', '20:00'],
+              with_food: true,
+              special_instructions: 'Monitor kidney function',
+            },
           },
           {
             medication_name: 'Insulin glargine',
             dosage: '20 units subcutaneous at bedtime',
             duration: 'Ongoing',
             instructions: 'Rotate injection sites. Monitor blood glucose levels',
+            schedule: {
+              frequency: 'Once Daily',
+              times: ['22:00'],
+              with_food: false,
+              special_instructions: 'Rotate injection sites',
+            },
           },
           {
             medication_name: 'Gabapentin',
             dosage: '300mg three times daily',
             duration: 'Ongoing',
             instructions: 'For neuropathic pain. May cause drowsiness',
+            schedule: {
+              frequency: 'Three Times Daily',
+              times: ['08:00', '14:00', '22:00'],
+              with_food: false,
+              special_instructions: 'May cause drowsiness',
+            },
           },
         ],
         doctor_notes: 'HbA1c elevated at 9.2%. Patient reports numbness and tingling in feet. Started on gabapentin for neuropathy. Diabetes education referral. Follow up in 4 weeks for glucose monitoring and medication adjustment.',
@@ -192,6 +258,12 @@ const MedicalFactorForm = ({ onSubmit, loading, onClearCarePlan }) => {
           dosage: '',
           duration: '',
           instructions: '',
+          schedule: {
+            frequency: '',
+            times: [],
+            with_food: false,
+            special_instructions: '',
+          },
         },
       ],
       doctor_notes: '',
@@ -205,8 +277,22 @@ const MedicalFactorForm = ({ onSubmit, loading, onClearCarePlan }) => {
     }
   };
 
-  const handleInputChange = (field, value, section = null, index = null) => {
-    if (section && index !== null) {
+  const handleInputChange = (field, value, section = null, index = null, nestedSection = null) => {
+    if (section && index !== null && nestedSection) {
+      // Handle nested object updates within array items (schedule within prescriptions)
+      setFormData(prev => ({
+        ...prev,
+        [section]: prev[section].map((item, i) => 
+          i === index ? { 
+            ...item, 
+            [nestedSection]: {
+              ...item[nestedSection],
+              [field]: value
+            }
+          } : item
+        ),
+      }));
+    } else if (section && index !== null) {
       // Handle nested array updates (prescriptions)
       setFormData(prev => ({
         ...prev,
@@ -288,6 +374,12 @@ const MedicalFactorForm = ({ onSubmit, loading, onClearCarePlan }) => {
           dosage: '',
           duration: '',
           instructions: '',
+          schedule: {
+            frequency: '',
+            times: [],
+            with_food: false,
+            special_instructions: '',
+          },
         },
       ],
     }));
@@ -330,68 +422,54 @@ const MedicalFactorForm = ({ onSubmit, loading, onClearCarePlan }) => {
 
   return (
     <Box component="form" onSubmit={handleSubmit}>
-      {/* Sample Data Controls */}
-      <Card sx={{ mb: 3, bgcolor: 'primary.light', color: 'primary.contrastText' }}>
-        <CardContent sx={{ py: 2 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
-            <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center' }}>
-              <SampleIcon sx={{ mr: 1 }} />
-              Quick Start Options
-            </Typography>
-            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-              <Button
-                variant="contained"
-                color="secondary"
-                onClick={handleSampleMenuOpen}
-                startIcon={<SampleIcon />}
-                sx={{ 
-                  bgcolor: 'secondary.main',
-                  '&:hover': { bgcolor: 'secondary.dark' }
-                }}
-              >
-                Load Sample Cases
-              </Button>
-              <Menu
-                anchorEl={sampleMenuAnchor}
-                open={Boolean(sampleMenuAnchor)}
-                onClose={handleSampleMenuClose}
-                PaperProps={{
-                  sx: { minWidth: 300 }
-                }}
-              >
-                {Object.entries(sampleCases).map(([key, caseData]) => (
-                  <MenuItem key={key} onClick={() => loadSampleData(key)}>
-                    <ListItemIcon>
-                      <HospitalIcon color="primary" />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={caseData.name}
-                      secondary={caseData.description}
-                    />
-                  </MenuItem>
-                ))}
-              </Menu>
-              <Button
-                variant="outlined"
-                onClick={clearForm}
-                sx={{ 
-                  color: 'primary.contrastText',
-                  borderColor: 'primary.contrastText',
-                  '&:hover': { 
-                    bgcolor: 'rgba(255,255,255,0.1)',
-                    borderColor: 'primary.contrastText'
-                  }
-                }}
-              >
-                Clear All Fields
-              </Button>
-            </Box>
-          </Box>
-          <Typography variant="body2" sx={{ mt: 1, opacity: 0.9 }}>
-            💡 Choose from sample medical cases: Heart Failure, Asthma, or Diabetes - or start with a clean form
-          </Typography>
-        </CardContent>
-      </Card>
+      {/* Sample Data Controls - Above Patient Information */}
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'flex-end',
+        gap: 1, 
+        mb: 2
+      }}>
+        <Button
+          variant="contained"
+          color="secondary"
+          onClick={handleSampleMenuOpen}
+          startIcon={<SampleIcon />}
+          size="small"
+          sx={{ 
+            bgcolor: 'secondary.main',
+            '&:hover': { bgcolor: 'secondary.dark' }
+          }}
+        >
+          Load Sample Cases
+        </Button>
+        <Menu
+          anchorEl={sampleMenuAnchor}
+          open={Boolean(sampleMenuAnchor)}
+          onClose={handleSampleMenuClose}
+          PaperProps={{
+            sx: { minWidth: 300 }
+          }}
+        >
+          {Object.entries(sampleCases).map(([key, caseData]) => (
+            <MenuItem key={key} onClick={() => loadSampleData(key)}>
+              <ListItemIcon>
+                <HospitalIcon color="primary" />
+              </ListItemIcon>
+              <ListItemText
+                primary={caseData.name}
+                secondary={caseData.description}
+              />
+            </MenuItem>
+          ))}
+        </Menu>
+        <Button
+          variant="outlined"
+          onClick={clearForm}
+          size="small"
+        >
+          Clear All Fields
+        </Button>
+      </Box>
 
       {/* Patient Information Section */}
       <Card className="form-section" sx={{ mb: 3 }}>
@@ -623,6 +701,72 @@ const MedicalFactorForm = ({ onSubmit, loading, onClearCarePlan }) => {
                       placeholder="e.g., Take with food"
                     />
                   </Grid>
+                  
+                  {/* Schedule Information */}
+                  <Grid item xs={12}>
+                    <Divider sx={{ my: 1 }}>
+                      <Chip label="Schedule Information" size="small" />
+                    </Divider>
+                  </Grid>
+                  
+                  <Grid item xs={12} sm={6}>
+                    <FormControl fullWidth>
+                      <InputLabel>Frequency</InputLabel>
+                      <Select
+                        value={prescription.schedule?.frequency || ''}
+                        onChange={(e) => handleInputChange('frequency', e.target.value, 'prescriptions', index, 'schedule')}
+                        label="Frequency"
+                      >
+                        <MenuItem value="Once Daily">Once Daily</MenuItem>
+                        <MenuItem value="Twice Daily">Twice Daily</MenuItem>
+                        <MenuItem value="Three Times Daily">Three Times Daily</MenuItem>
+                        <MenuItem value="Four Times Daily">Four Times Daily</MenuItem>
+                        <MenuItem value="As Needed">As Needed</MenuItem>
+                        <MenuItem value="Weekly">Weekly</MenuItem>
+                        <MenuItem value="Every Other Day">Every Other Day</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  
+                  <Grid item xs={12} sm={6}>
+                    <FormControl fullWidth>
+                      <InputLabel>With Food</InputLabel>
+                      <Select
+                        value={prescription.schedule?.with_food ? 'yes' : 'no'}
+                        onChange={(e) => handleInputChange('with_food', e.target.value === 'yes', 'prescriptions', index, 'schedule')}
+                        label="With Food"
+                      >
+                        <MenuItem value="no">Any Time</MenuItem>
+                        <MenuItem value="yes">With Food</MenuItem>
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Schedule Times (comma separated)"
+                      value={prescription.schedule?.times?.join(', ') || ''}
+                      onChange={(e) => {
+                        const times = e.target.value.split(',').map(t => t.trim()).filter(t => t);
+                        handleInputChange('times', times, 'prescriptions', index, 'schedule');
+                      }}
+                      placeholder="e.g., 08:00, 14:00, 20:00"
+                      helperText="Enter times in 24-hour format (HH:MM), separated by commas"
+                    />
+                  </Grid>
+                  
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      label="Special Schedule Instructions"
+                      value={prescription.schedule?.special_instructions || ''}
+                      onChange={(e) => handleInputChange('special_instructions', e.target.value, 'prescriptions', index, 'schedule')}
+                      placeholder="e.g., Monitor blood pressure, Rotate injection sites"
+                      multiline
+                      rows={2}
+                    />
+                  </Grid>
                 </Grid>
               </CardContent>
             </Card>
@@ -632,12 +776,135 @@ const MedicalFactorForm = ({ onSubmit, loading, onClearCarePlan }) => {
             variant="outlined"
             onClick={addPrescription}
             startIcon={<AddIcon />}
-            sx={{ mt: 1 }}
+            sx={{ mt: 1, mr: 2 }}
           >
             Add Another Prescription
           </Button>
+          
+          <Button
+            variant="outlined"
+            onClick={() => setShowScheduleTable(!showScheduleTable)}
+            startIcon={<ScheduleIcon />}
+            endIcon={showScheduleTable ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            sx={{ mt: 1 }}
+            color="secondary"
+          >
+            {showScheduleTable ? 'Hide' : 'Show'} Medication Schedule
+          </Button>
         </CardContent>
       </Card>
+
+      {/* Medication Schedule Table */}
+      <Collapse in={showScheduleTable}>
+        <Card className="form-section" sx={{ mb: 3 }}>
+          <CardContent>
+            <Typography variant="h6" className="form-section-title" sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+              <ScheduleIcon sx={{ mr: 1 }} />
+              Medication Schedule Table
+            </Typography>
+            
+            {formData.prescriptions.length > 0 && formData.prescriptions.some(p => p.medication_name) ? (
+              <TableContainer component={Paper} sx={{ maxHeight: 400 }}>
+                <Table stickyHeader>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell><strong>Medication</strong></TableCell>
+                      <TableCell><strong>Dosage</strong></TableCell>
+                      <TableCell><strong>Frequency</strong></TableCell>
+                      <TableCell><strong>Schedule Times</strong></TableCell>
+                      <TableCell><strong>With Food</strong></TableCell>
+                      <TableCell><strong>Duration</strong></TableCell>
+                      <TableCell><strong>Special Instructions</strong></TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {formData.prescriptions
+                      .filter(prescription => prescription.medication_name.trim())
+                      .map((prescription, index) => (
+                      <TableRow key={index} hover>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                            {prescription.medication_name}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">
+                            {prescription.dosage || '-'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Chip 
+                            label={prescription.schedule?.frequency || 'Not Set'} 
+                            size="small"
+                            color={prescription.schedule?.frequency ? 'primary' : 'default'}
+                            variant="outlined"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                            {prescription.schedule?.times?.length > 0 ? (
+                              prescription.schedule.times.map((time, timeIndex) => (
+                                <Chip 
+                                  key={timeIndex}
+                                  label={time}
+                                  size="small"
+                                  color="secondary"
+                                  variant="outlined"
+                                />
+                              ))
+                            ) : (
+                              <Typography variant="body2" color="textSecondary">-</Typography>
+                            )}
+                          </Box>
+                        </TableCell>
+                        <TableCell>
+                          <Chip 
+                            label={prescription.schedule?.with_food ? 'With Food' : 'Any Time'}
+                            size="small"
+                            color={prescription.schedule?.with_food ? 'success' : 'default'}
+                            variant="outlined"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">
+                            {prescription.duration || '-'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2" sx={{ maxWidth: 150 }}>
+                            {prescription.schedule?.special_instructions || 
+                             prescription.instructions || '-'}
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            ) : (
+              <Box sx={{ textAlign: 'center', py: 4 }}>
+                <ScheduleIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
+                <Typography variant="h6" color="textSecondary" gutterBottom>
+                  No medications added yet
+                </Typography>
+                <Typography variant="body2" color="textSecondary">
+                  Add medications above to see their schedule in this table
+                </Typography>
+              </Box>
+            )}
+            
+            <Box sx={{ mt: 2, p: 2, bgcolor: 'info.light', borderRadius: 1 }}>
+              <Typography variant="body2" color="info.dark">
+                <strong>💡 Medication Schedule Benefits:</strong>
+                <br />• Visual overview of all medications and timing
+                <br />• Easy identification of potential drug interactions
+                <br />• Helps ensure proper spacing between doses
+                <br />• Useful for patient education and compliance
+              </Typography>
+            </Box>
+          </CardContent>
+        </Card>
+      </Collapse>
 
       {/* Doctor Notes Section */}
       <Card className="form-section" sx={{ mb: 3 }}>
@@ -679,7 +946,7 @@ const MedicalFactorForm = ({ onSubmit, loading, onClearCarePlan }) => {
               Generating Care Plan...
             </Box>
           ) : (
-            '🚀 Generate Care Plan with Nova Micro'
+            'Submit'
           )}
         </Button>
       </Box>

@@ -40,7 +40,7 @@ The application collects and processes:
 - **Axios** - HTTP client for API calls
 - **React Scripts** - Development and build tools
 
-## 🏃‍♂️ Quick Start
+## 🏃‍♂️ Development Setup
 
 ### Prerequisites
 
@@ -215,8 +215,8 @@ npm run build
 
 ### Deployment Options
 - **Static Hosting**: Serve the `build` folder
-- **Docker**: Create containerized deployment
 - **CDN**: Deploy to CDN for global distribution
+- **Local Development**: Run with `npm start` for hot reloading
 
 ## 🔧 Customization
 
