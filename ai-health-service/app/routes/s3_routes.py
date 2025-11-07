@@ -238,6 +238,54 @@ async def extract_medical_data(
         # Get extracted text
         extracted_text = result.get("extracted_text", "")
         
+        # If it's a JSON file, try to parse structured data directly
+        if file_extension == "json":
+            try:
+                import json
+                json_data = json.loads(extracted_text)
+                
+                # Extract patient info from JSON structure
+                if isinstance(json_data, dict):
+                    # Look for patient_info or similar structures
+                    for key, value in json_data.items():
+                        if "patient" in key.lower() and isinstance(value, dict):
+                            if "age" in value:
+                                patient_info["age"] = str(value["age"])
+                            if "gender" in value:
+                                patient_info["gender"] = str(value["gender"])
+                            if "weight" in value:
+                                patient_info["weight"] = str(value["weight"])
+                            if "height" in value:
+                                patient_info["height"] = str(value["height"])
+                            if "bmi" in value:
+                                patient_info["bmi"] = str(value["bmi"])
+                        
+                        # Extract vital signs from JSON
+                        if "vital" in key.lower() and isinstance(value, dict):
+                            for vital_key, vital_value in value.items():
+                                vital_signs[vital_key] = str(vital_value)
+                        
+                        # Extract medications from JSON
+                        if "prescription" in key.lower() or "medication" in key.lower():
+                            if isinstance(value, list):
+                                for med in value:
+                                    if isinstance(med, dict):
+                                        medications.append({
+                                            "name": med.get("medication_name", med.get("name", "Unknown")),
+                                            "medication_name": med.get("medication_name", med.get("name", "Unknown")),
+                                            "dosage": med.get("dosage", "N/A"),
+                                            "duration": med.get("duration", "As prescribed")
+                                        })
+                        
+                        # Extract medical conditions from JSON
+                        if "condition" in key.lower() or "diagnosis" in key.lower():
+                            if isinstance(value, list):
+                                medical_conditions.extend([str(cond) for cond in value])
+                            elif isinstance(value, str):
+                                medical_conditions.append(value)
+            except:
+                pass  # Fall back to NER and text parsing
+        
         # Extract structured data from NER results
         if "ner_analysis" in result and "medical_entities" in result["ner_analysis"]:
             entities = result["ner_analysis"]["medical_entities"]
@@ -246,37 +294,240 @@ async def extract_medical_data(
                 category = entity.get("category", "").upper()
                 entity_type = entity.get("type", "").upper()
                 text = entity.get("text", "")
+                attributes = entity.get("attributes", [])
                 
                 if category == "MEDICAL_CONDITION":
                     medical_conditions.append(text)
                 elif category == "MEDICATION":
+                    # Extract dosage and frequency from attributes if available
+                    dosage = "N/A"
+                    frequency = "N/A"
+                    
+                    for attr in attributes:
+                        attr_type = attr.get("Type", "").upper()
+                        attr_text = attr.get("Text", "")
+                        
+                        if attr_type in ["DOSAGE", "STRENGTH"]:
+                            dosage = attr_text
+                        elif attr_type == "FREQUENCY":
+                            frequency = attr_text
+                    
                     medications.append({
                         "name": text,
                         "medication_name": text,
-                        "dosage": "N/A",
-                        "duration": "N/A",
+                        "dosage": f"{dosage} {frequency}".strip(),
+                        "duration": "As prescribed",
                         "type": entity_type,
                         "confidence": entity.get("score", 0.0)
                     })
         
+        # Extract PHI entities for patient demographics
+        if "ner_analysis" in result and "phi_entities" in result["ner_analysis"]:
+            phi_entities = result["ner_analysis"]["phi_entities"]
+            
+            for entity in phi_entities:
+                category = entity.get("category", "").upper()
+                entity_type = entity.get("type", "").upper()
+                text = entity.get("text", "")
+                
+                if entity_type == "NAME":
+                    if "name" not in patient_info:
+                        patient_info["name"] = text
+                elif entity_type == "AGE":
+                    if "age" not in patient_info:
+                        # Extract numeric age
+                        import re
+                        age_match = re.search(r'\d+', text)
+                        if age_match:
+                            patient_info["age"] = age_match.group()
+        
         # Simple text parsing - extract basic information
         lines = extracted_text.split('\n')
+        vital_signs = {}
         
-        # Extract patient info
+        # Also check full text for patterns that might span lines
+        full_text_lower = extracted_text.lower()
+        
+        # Extract patient info and vital signs
         for line in lines:
             line = line.strip()
-            if "Patient:" in line:
+            line_lower = line.lower()
+            
+            # Extract patient basic info
+            if "patient:" in line_lower or "name:" in line_lower:
                 try:
-                    name = line.split('Patient:')[1].strip()
-                    patient_info["name"] = name
+                    name = line.split(':', 1)[1].strip()
+                    if name and not any(char.isdigit() for char in name):  # Avoid capturing IDs as names
+                        patient_info["name"] = name
                 except:
                     pass
-            elif "Age:" in line:
+            elif "age:" in line_lower or "years old" in line_lower or "y/o" in line_lower:
                 try:
-                    age = line.split('Age:')[1].strip().split()[0]
-                    patient_info["age"] = age
+                    import re
+                    # Try different age patterns
+                    age_patterns = [
+                        r'age:?\s*(\d+)',
+                        r'(\d+)\s*years?\s*old',
+                        r'(\d+)\s*y/?o',
+                        r'age\s*(\d+)'
+                    ]
+                    
+                    for pattern in age_patterns:
+                        age_match = re.search(pattern, line_lower)
+                        if age_match:
+                            patient_info["age"] = age_match.group(1)
+                            break
                 except:
                     pass
+            elif any(keyword in line_lower for keyword in ["gender:", "sex:", "male", "female", "m/f"]):
+                try:
+                    import re
+                    # Try different gender patterns
+                    gender_patterns = [
+                        r'(?:gender|sex):?\s*(male|female|m|f)',
+                        r'\b(male|female)\b',
+                        r'm/f:?\s*(male|female|m|f)'
+                    ]
+                    
+                    for pattern in gender_patterns:
+                        gender_match = re.search(pattern, line_lower)
+                        if gender_match:
+                            gender_value = gender_match.group(1).lower()
+                            if gender_value in ['m', 'male']:
+                                patient_info["gender"] = "Male"
+                            elif gender_value in ['f', 'female']:
+                                patient_info["gender"] = "Female"
+                            else:
+                                patient_info["gender"] = gender_value.title()
+                            break
+                except:
+                    pass
+            elif "weight:" in line_lower or "wt:" in line_lower or "kg" in line_lower or "lbs" in line_lower:
+                try:
+                    import re
+                    # Try different weight patterns
+                    weight_patterns = [
+                        r'weight:?\s*(\d+(?:\.\d+)?)\s*(kg|lbs?|pounds?)',
+                        r'wt:?\s*(\d+(?:\.\d+)?)\s*(kg|lbs?|pounds?)',
+                        r'(\d+(?:\.\d+)?)\s*(kg|lbs?|pounds?)',
+                        r'weight:?\s*(\d+(?:\.\d+)?)'
+                    ]
+                    
+                    for pattern in weight_patterns:
+                        weight_match = re.search(pattern, line_lower)
+                        if weight_match:
+                            weight_value = weight_match.group(1)
+                            weight_unit = weight_match.group(2) if len(weight_match.groups()) > 1 else "kg"
+                            patient_info["weight"] = f"{weight_value} {weight_unit}"
+                            vital_signs["weight"] = f"{weight_value} {weight_unit}"
+                            break
+                except:
+                    pass
+            elif "height:" in line_lower:
+                try:
+                    height_text = line.split(':', 1)[1].strip()
+                    patient_info["height"] = height_text
+                    vital_signs["height"] = height_text
+                except:
+                    pass
+            elif "bmi:" in line_lower:
+                try:
+                    bmi_text = line.split(':', 1)[1].strip()
+                    patient_info["bmi"] = bmi_text
+                    vital_signs["bmi"] = bmi_text
+                except:
+                    pass
+            
+            # Extract vital signs
+            elif "blood pressure:" in line_lower or "bp:" in line_lower:
+                try:
+                    bp_text = line.split(':', 1)[1].strip()
+                    vital_signs["blood_pressure"] = bp_text
+                except:
+                    pass
+            elif "heart rate:" in line_lower or "hr:" in line_lower or "pulse:" in line_lower:
+                try:
+                    hr_text = line.split(':', 1)[1].strip()
+                    vital_signs["heart_rate"] = hr_text
+                except:
+                    pass
+            elif "temperature:" in line_lower or "temp:" in line_lower:
+                try:
+                    temp_text = line.split(':', 1)[1].strip()
+                    vital_signs["temperature"] = temp_text
+                except:
+                    pass
+            elif "respiratory rate:" in line_lower or "rr:" in line_lower:
+                try:
+                    rr_text = line.split(':', 1)[1].strip()
+                    vital_signs["respiratory_rate"] = rr_text
+                except:
+                    pass
+            elif "oxygen saturation:" in line_lower or "o2 sat:" in line_lower or "spo2:" in line_lower:
+                try:
+                    o2_text = line.split(':', 1)[1].strip()
+                    vital_signs["oxygen_saturation"] = o2_text
+                except:
+                    pass
+        
+        # Additional full-text pattern matching for demographics
+        import re
+        
+        # If we haven't found age yet, try more patterns
+        if "age" not in patient_info:
+            age_patterns = [
+                r'(\d+)\s*(?:year|yr)s?\s*old',
+                r'age\s*(?:of\s*)?(?:is\s*)?(\d+)',
+                r'(\d+)\s*y/?o\b',
+                r'\b(\d+)\s*years?\b'
+            ]
+            for pattern in age_patterns:
+                age_match = re.search(pattern, full_text_lower)
+                if age_match:
+                    age_val = int(age_match.group(1))
+                    if 0 < age_val < 150:  # Reasonable age range
+                        patient_info["age"] = str(age_val)
+                        break
+        
+        # If we haven't found gender yet, try more patterns
+        if "gender" not in patient_info:
+            gender_patterns = [
+                r'\b(male|female)\s*(?:patient|person|individual)',
+                r'(?:patient|person|individual)\s*(?:is\s*)?(?:a\s*)?(male|female)',
+                r'\b(male|female)\b(?!\s*(?:relative|family|parent))',
+                r'gender\s*(?:is\s*)?(?::\s*)?(male|female|m|f)\b',
+                r'sex\s*(?:is\s*)?(?::\s*)?(male|female|m|f)\b'
+            ]
+            for pattern in gender_patterns:
+                gender_match = re.search(pattern, full_text_lower)
+                if gender_match:
+                    gender_value = gender_match.group(1).lower()
+                    if gender_value in ['m', 'male']:
+                        patient_info["gender"] = "Male"
+                    elif gender_value in ['f', 'female']:
+                        patient_info["gender"] = "Female"
+                    break
+        
+        # If we haven't found weight yet, try more patterns
+        if "weight" not in patient_info:
+            weight_patterns = [
+                r'weighs?\s*(\d+(?:\.\d+)?)\s*(kg|lbs?|pounds?)',
+                r'weight\s*(?:of\s*)?(?:is\s*)?(\d+(?:\.\d+)?)\s*(kg|lbs?|pounds?)',
+                r'(\d+(?:\.\d+)?)\s*(kg|kilograms?|lbs?|pounds?)\s*(?:weight|body\s*weight)',
+                r'\b(\d+(?:\.\d+)?)\s*kg\b',
+                r'\b(\d+(?:\.\d+)?)\s*(?:lbs?|pounds?)\b'
+            ]
+            for pattern in weight_patterns:
+                weight_match = re.search(pattern, full_text_lower)
+                if weight_match:
+                    weight_value = weight_match.group(1)
+                    weight_unit = weight_match.group(2) if len(weight_match.groups()) > 1 else "kg"
+                    weight_val = float(weight_value)
+                    # Reasonable weight range
+                    if 20 < weight_val < 300:  
+                        patient_info["weight"] = f"{weight_value} {weight_unit}"
+                        vital_signs["weight"] = f"{weight_value} {weight_unit}"
+                        break
         
         # Extract medications - look for numbered lists with mg dosages
         for i, line in enumerate(lines):
@@ -328,7 +579,7 @@ async def extract_medical_data(
             "medical_conditions": medical_conditions,
             "diagnosis": extracted_text[:500] + "..." if len(extracted_text) > 500 else extracted_text,
             "raw_text": extracted_text,
-            "vital_signs": {},
+            "vital_signs": vital_signs,
             "lab_results": {},
             "clinical_notes": result.get("extracted_text", ""),
             "raw_extraction": result
@@ -338,7 +589,7 @@ async def extract_medical_data(
         
         return {
             "success": True,
-            "message": "Medical data extracted successfully",
+            "message": "Medical data extracted successfully with enhanced demographics parsing",
             "data": medical_data
         }
         
