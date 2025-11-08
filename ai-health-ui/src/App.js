@@ -169,7 +169,7 @@ const AppContent = () => {
             <MenuIcon />
           </IconButton>
           <Typography variant="h6" noWrap component="div">
-            🏥 AI Health - Medical Care Plan Generator
+            🏥 AI-Health-AI
           </Typography>
         </Toolbar>
       </AppBar>
